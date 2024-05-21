@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from routes.files import files_bp
 
 app = Flask(__name__)
-app.register_blueprint(files_bp, url_prefix='/api')
+app.register_blueprint(files_bp, url_prefix='/api/files')
 
 @app.route('/', methods=['GET'])
 def health():

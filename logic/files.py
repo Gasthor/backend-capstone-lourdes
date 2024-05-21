@@ -10,9 +10,3 @@ def search_file(namefolder, namefile):
     else:
         return "Archivo no encontrado."
 
-def rename_column(df, column_value):
-
-    for y,x in column_value.items():
-        print(y, x)
-
-    return df
