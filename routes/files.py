@@ -74,6 +74,9 @@ def get_files():
         file = file.replace("_",".")
         file = file.split(".")
         response.append({ "name" : file[0], "year" : file[1]})
+    
+    response = sorted(response, key=lambda x: x["year"])
+
     return response, 200
 
 
