@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, json, request, jsonify
 from datetime import datetime
 import os
 import pandas as pd
@@ -9,12 +9,19 @@ files_bp = Blueprint('files', __name__)
 
 @files_bp.route('/upload', methods=['POST'])
 def upload_excel():
-    data = request.form
-    data = data.to_dict()
-    jsonify(data)
+    data = request.form.get("data")
+    color = request.form.get("COLOR VARIEDAD")
 
+    data_dict = json.loads(data)
+
+    print(data, color)
     # Invertir clave-valor ejemplo: {"hola" : "chao"} => {"chao" : "hola"}
-    data = {v: k for k, v in data.items()}
+    #data_dict_upper = {k.upper(): v.upper() for k, v in data_dict.items()}
+
+    data = {v: k for k, v in data_dict.items()}
+    print(data, color)
+
+    jsonify(data)
 
     if 'file' not in request.files:
         return jsonify({"error": "No se cargo el archivo1"}), 400
@@ -28,7 +35,8 @@ def upload_excel():
         
         try:
             df = pd.read_excel(file)
-            df = df.rename(columns= data)
+            #df = df.apply(lambda x: x.str.upper() if x.dtype == "object" else x)
+            df = df.rename(columns= data, errors="raise")
             date = df["FECHA"].iloc[0]
 
             if int(date):
@@ -37,6 +45,8 @@ def upload_excel():
                 df["FECHA"] = df["FECHA"].dt.date
 
             df["FECHA"] = pd.to_datetime(df["FECHA"])
+            df["DIA"] = df["FECHA"].dt.day
+            df["MES"] = df["FECHA"].dt.month
             df["AÑO"] = df["FECHA"].dt.year
             year = df["AÑO"].iloc[0]
             name_file = f"Vendimia_{year}.xlsx"
@@ -46,6 +56,25 @@ def upload_excel():
             
             else:
                 #### LOGICA ETL Y AGREGAR DF AL HISTORICO
+
+                if color != None:
+                    df = df.rename(columns={color: "COLOR VARIEDAD"})
+                    df = df[df["COLOR VARIEDAD"] == "T"]
+                    df = df.drop("COLOR VARIEDAD", axis=1)
+                else:
+                    df = df[(df["FAMILIA"] != "Viognier") & df["FAMILIA"] != "Chardonnay" & df["FAMILIA"] != "Gewurztraminer" & df["FAMILIA"] != "Riesling" & df["FAMILIA"] != "Sauvignon Blanc" & df["FAMILIA"] != "Semillon"]
+
+                df["CALIDAD"] = df["CALIDAD"].replace({'BL': 'Blend', 'PR': 'Premium'})
+                df["FAMILIA"] = df["FAMILIA"].str.upper()
+                df["PRODUCTOR"] = df["PRODUCTOR"].str.upper()
+                df["RUT"] = df["RUT"].astype(str)
+
+                df["NUM_SEMANA"] = df["FECHA"].dt.strftime("%G-%V")
+                df["NUM_SEMANA"] = df.groupby(df["FECHA"].dt.year)["NUM_SEMANA"].transform(lambda x: (pd.to_numeric(x.str[-2:]) - pd.to_numeric(x.str[-2:]).min() + 1))
+
+
+                #######
+                df = df[["FECHA", "CONTRATO", "PRODUCTOR", "KILOS ENTREGADOS", "RUT", "FAMILIA", "AREA", "CALIDAD", "NUM_SEMANA", "DIA", "MES", "AÑO"]]
                 filepath = os.path.join("./uploads/",name_file)
                 os.makedirs("./uploads/", exist_ok=True)
                 df.to_excel(filepath,index=False)
