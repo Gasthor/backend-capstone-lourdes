@@ -1,4 +1,4 @@
-from flask import Blueprint, json, request, jsonify
+from flask import Blueprint, abort, json, request, jsonify, send_file
 from datetime import datetime
 import os
 import pandas as pd
@@ -75,9 +75,34 @@ def upload_excel():
 
                 #######
                 df = df[["FECHA", "CONTRATO", "PRODUCTOR", "KILOS ENTREGADOS", "RUT", "FAMILIA", "AREA", "CALIDAD", "NUM_SEMANA", "DIA", "MES", "AÑO"]]
+                
+                
+
+                ###Agregar informacion a archivo historico de vendimias
+                if search_file("./generated_excel/", "Vendimia_historica.xlsx") == "Archivo no encontrado.":
+                    filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
+                    os.makedirs("./generated_excel/", exist_ok=True)
+                    df.to_excel(filepath,index=False)
+                else:
+                    df_historico = pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
+                    result = df_historico[df_historico["AÑO"] == year]
+                    if len(result) > 0:
+                        df_historico = df_historico[df_historico["AÑO"] != year]
+                    df_historico = pd.concat([df_historico, df])
+
+                    df_historico = df_historico.sort_values(by="FECHA")
+
+                    filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
+                    os.makedirs("./generated_excel/", exist_ok=True)
+                    df_historico.to_excel(filepath,index=False)
+                
+                
+
+                ###Guardar archivo en carpeta uploads
                 filepath = os.path.join("./uploads/",name_file)
                 os.makedirs("./uploads/", exist_ok=True)
                 df.to_excel(filepath,index=False)
+
                 return jsonify({"message": f"Archivo de la vendimia {year} cargado con exito"}), 200
  
         except Exception as e:
@@ -108,7 +133,18 @@ def get_files():
 
     return response, 200
 
-
-
+@files_bp.route('/download/<path:filename>', methods=['GET'])
+def download(filename):
+    print(filename)
+    try:
+        file_path = f"./generated_excel/{filename}"
+        if search_file("./generated_excel/", "Vendimia_historica.xlsx") == "Archivo no encontrado.":
+            abort(404, description="File not found")
+        # Crear una respuesta HTTP con el archivo adjunto
+        return send_file(file_path, as_attachment=True)
+        
+    except Exception as e:
+        print(f"Error al procesar la solicitud: {e}")
+        abort(500, description="Internal server error")
 
 
