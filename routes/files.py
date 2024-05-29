@@ -74,10 +74,7 @@ def upload_excel():
 
 
                 #######
-                df = df[["FECHA", "CONTRATO", "PRODUCTOR", "KILOS ENTREGADOS", "RUT", "FAMILIA", "AREA", "CALIDAD", "NUM_SEMANA", "DIA", "MES", "AÑO"]]
-                
-                
-
+                df = df[["FECHA", "CONTRATO", "PRODUCTOR", "KILOS ENTREGADOS", "RUT", "FAMILIA", "AREA","GRADO BRIX","TEMPERATURA", "CALIDAD", "NUM_SEMANA", "DIA", "MES", "AÑO"]]
                 ###Agregar informacion a archivo historico de vendimias
                 if search_file("./generated_excel/", "Vendimia_historica.xlsx") == "Archivo no encontrado.":
                     filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
@@ -110,11 +107,19 @@ def upload_excel():
     else:
         return jsonify({"error": "Archivo cargado no es .xlsx"}), 400
     
-@files_bp.route('/delete/<name>', methods=['DELETE'])
-def delete_excel(name):
+@files_bp.route('/delete/<name>/<year>', methods=['DELETE'])
+def delete_excel(name,year):
     try:
-        os.remove(f"./uploads/{name}.xlsx")
+        os.remove(f"./uploads/{name}_{year}.xlsx")
         ### LOGICA DE ELIMINAR ARCHIVO DE DF HISTORICO
+        
+        df_historico_delete = pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
+        df_historico_delete = df_historico_delete[df_historico_delete["AÑO"] != int(year)]
+
+        filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
+        os.makedirs("./generated_excel/", exist_ok=True)
+        df_historico_delete.to_excel(filepath,index=False)
+
     except :
             return jsonify({"error": "Archivo no encontrado, si el problema persiste, comunicarse con el administrador."}), 500 
     return jsonify({"message": f"Archivo '{name}' eliminado con exito"}), 200
@@ -123,11 +128,27 @@ def delete_excel(name):
 def get_files():
     folder = os.listdir("./uploads")
     files = [name for name in folder if os.path.isfile(os.path.join("./uploads",name))]
+    df= pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
+
     response = []
     for file in files:
         file = file.replace("_",".")
         file = file.split(".")
-        response.append({ "name" : file[0], "year" : file[1]})
+        ## Obtener los kilos producidos por semana en el año iterado
+
+        year = int(file[1])
+
+        df_filtred = df[df["AÑO"] == year]
+        df_grouped = df_filtred.groupby(["NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
+        df_grouped = df_grouped.rename(columns={"NUM_SEMANA":"Semana", "KILOS ENTREGADOS": "Kilos"})
+        df_json = df_grouped.to_dict(orient="records")
+
+        print(df_json)
+
+        response.append({ "name" : file[0], "year" : file[1], "data": df_json})
+
+
+
     
     response = sorted(response, key=lambda x: x["year"])
 
