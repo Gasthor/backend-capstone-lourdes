@@ -39,12 +39,10 @@ def upload_excel():
             df = df.rename(columns= data, errors="raise")
             date = df["FECHA"].iloc[0]
 
-            if int(date):
-                df["FECHA"] = pd.to_numeric(df["FECHA"], errors="coerce")
-                df["FECHA"] = pd.to_datetime(df["FECHA"], unit="D", origin="1899-12-30")
-                df["FECHA"] = df["FECHA"].dt.date
-
-            df["FECHA"] = pd.to_datetime(df["FECHA"])
+            if pd.api.types.is_numeric_dtype(df["FECHA"]):
+                df["FECHA"] = pd.to_datetime(df["FECHA"], unit='D', origin='1899-12-30', errors='coerce')
+            else:
+                df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
             df["DIA"] = df["FECHA"].dt.day
             df["MES"] = df["FECHA"].dt.month
             df["AÑO"] = df["FECHA"].dt.year
