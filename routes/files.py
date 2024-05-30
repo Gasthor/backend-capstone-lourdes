@@ -57,12 +57,12 @@ def upload_excel():
             else:
                 #### LOGICA ETL Y AGREGAR DF AL HISTORICO
 
-                if color != None:
+                if color and color != "":
                     df = df.rename(columns={color: "COLOR VARIEDAD"})
                     df = df[df["COLOR VARIEDAD"] == "T"]
                     df = df.drop("COLOR VARIEDAD", axis=1)
                 else:
-                    df = df[(df["FAMILIA"] != "Viognier") & df["FAMILIA"] != "Chardonnay" & df["FAMILIA"] != "Gewurztraminer" & df["FAMILIA"] != "Riesling" & df["FAMILIA"] != "Sauvignon Blanc" & df["FAMILIA"] != "Semillon"]
+                    df = df[(df["FAMILIA"] != "Viognier") & (df["FAMILIA"] != "Chardonnay") & (df["FAMILIA"] != "Gewurztraminer") & (df["FAMILIA"] != "Riesling") & (df["FAMILIA"] != "Sauvignon Blanc") & (df["FAMILIA"] != "Semillon")]
 
                 df["CALIDAD"] = df["CALIDAD"].replace({'BL': 'Blend', 'PR': 'Premium'})
                 df["FAMILIA"] = df["FAMILIA"].str.upper()
