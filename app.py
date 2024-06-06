@@ -4,6 +4,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from routes.files import files_bp
+from routes.vendimia import vendimia_bp
 
 load_dotenv()
 
@@ -15,6 +16,7 @@ app = Flask(__name__)
 # Configurar CORS para manejar orígenes explícitamente
 CORS(app, origins=origins)
 app.register_blueprint(files_bp, url_prefix='/api/files')
+app.register_blueprint(vendimia_bp, url_prefix='/api/vendimia')
 
 
 @app.route('/', methods=['GET'])
