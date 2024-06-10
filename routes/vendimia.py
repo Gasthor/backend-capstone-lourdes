@@ -47,10 +47,15 @@ def get_files():
             week.append(str(i+1) + " Semanas")
         weeks.append(week)
 
+    formatted_years = ', '.join(map(str, years))
+    total_kilos = int(df_resumen['Kilos'].sum())
+
     return jsonify({
         "data": df_json,
+        "years": formatted_years,
+        "total": total_kilos,
         "duration": duration_weeks,
-        "weeks" : weeks
+        "weeks": weeks
     }), 200
 
 @vendimia_bp.route('/planificacion', methods=['POST'])
