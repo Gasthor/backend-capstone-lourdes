@@ -19,12 +19,11 @@ def upload_excel():
     #data_dict_upper = {k.upper(): v.upper() for k, v in data_dict.items()}
 
     data = {v: k for k, v in data_dict.items()}
-    print(data, color)
 
     jsonify(data)
 
     if 'file' not in request.files:
-        return jsonify({"error": "No se cargo el archivo1"}), 400
+        return jsonify({"error": "No se cargo el archivo"}), 400
 
     file = request.files['file']
 
@@ -37,16 +36,19 @@ def upload_excel():
             df = pd.read_excel(file)
             #df = df.apply(lambda x: x.str.upper() if x.dtype == "object" else x)
             df = df.rename(columns= data, errors="raise")
-            date = df["FECHA"].iloc[0]
 
             if pd.api.types.is_numeric_dtype(df["FECHA"]):
                 df["FECHA"] = pd.to_datetime(df["FECHA"], unit='D', origin='1899-12-30', errors='coerce')
             else:
                 df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
+            #Elimina los NaN que esten presente en la columna FECHA
+            df = df.dropna(subset=['FECHA'])
+
             df["DIA"] = df["FECHA"].dt.day
             df["MES"] = df["FECHA"].dt.month
-            df["AÑO"] = df["FECHA"].dt.year
+            df["AÑO"] = df["FECHA"].dt.year.astype(int)
             year = df["AÑO"].iloc[0]
+            
             name_file = f"Vendimia_{year}.xlsx"
             check_file = search_file("./uploads",f"Vendimia_{year}.xlsx")
             if check_file  == name_file:
@@ -126,6 +128,8 @@ def delete_excel(name,year):
 def get_files():
     folder = os.listdir("./uploads")
     files = [name for name in folder if os.path.isfile(os.path.join("./uploads",name))]
+    if len(files) == 0:
+        return jsonify({"message" : "No hay vendimias cargadas en el sistema."})
     df= pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
 
     response = []
