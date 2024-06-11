@@ -4,18 +4,19 @@ import pandas as pd
 # Verifica y modifica de ser necesario los factores para complir y no sobre pasar los limites semanales de la bodega
 def verificar_factores(df_semanas, kilos_objetivo, factor_semana, limite_kilos_semana):
   factor_semana_modificado = []
-
+  print(df_semanas)
   for index,factor in enumerate(factor_semana):
-    kilos_factor = df_semanas.loc[index, "Porcentaje"] * (factor/100) * kilos_objetivo
+    if index in df_semanas.index:
+        kilos_factor = df_semanas.loc[index, "Porcentaje"] * (factor/100) * kilos_objetivo
 
-    if kilos_factor > limite_kilos_semana[index]:
-      kilos_semana = df_semanas.loc[index, "Porcentaje"] * kilos_objetivo
-      nuevo_porcentaje = (df_semanas.loc[index, "Porcentaje"] * limite_kilos_semana[index])/kilos_semana
-      df_semanas.loc[index, "Porcentaje"] = nuevo_porcentaje
-      factor_semana_modificado.append(-100)
+        if kilos_factor > limite_kilos_semana[index]:
+            kilos_semana = df_semanas.loc[index, "Porcentaje"] * kilos_objetivo
+            nuevo_porcentaje = (df_semanas.loc[index, "Porcentaje"] * limite_kilos_semana[index])/kilos_semana
+            df_semanas.loc[index, "Porcentaje"] = nuevo_porcentaje
+            factor_semana_modificado.append(-100)
 
-    else:
-      factor_semana_modificado.append(factor_semana[index])
+        else:
+            factor_semana_modificado.append(factor_semana[index])
   print(factor_semana,factor_semana_modificado)
   return factor_semana_modificado
 
@@ -108,6 +109,7 @@ def generar_semanas(inicio, fin, kilos_obj, limite_kilos_semana, df_semanas_sele
           kilos_excedentes = semana.redistribuir_excedentes(kilos_excedentes)
 
         porcentaje_semana = porcentajes_semana.get(num_semana, 0)
+        
         semana = Semana(num_semana, porcentaje_semana, limite_kilos_semana[num_semana-1], False if factor_semana[num_semana-1] == 0 else True)
         kilos_excedentes = semana.calcular_kilos_entregar(kilos_obj, kilos_excedentes)
         kilos_repartidos += semana.kilos_entregar

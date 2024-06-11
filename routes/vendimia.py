@@ -120,15 +120,23 @@ def strat_planning():
 
     df_weekly_average = pd.DataFrame({'NUM_SEMANA': weekly_average.index, 'Promedio Kilos': np.round(weekly_average.values, 1)})
 
-    df_pesos = pesos_semanal(1,duration, list_factor_week, obj_kilos, list_limit_week, df_weekly_average)
-    df_salida = generar_semanas(1, duration, obj_kilos, list_limit_week, df_pesos,list_factor_week)
+    try:
+        df_pesos = pesos_semanal(1,duration, list_factor_week, obj_kilos, list_limit_week, df_weekly_average)
+        df_salida = generar_semanas(1, duration, obj_kilos, list_limit_week, df_pesos,list_factor_week)
+    except Exception as e:
+        return jsonify({
+        "message" : f"Error en calcular semanas, mensaje error: ${e}",
+    }), 400
+    df_salida['Porcentaje'] = df_salida['Porcentaje'].fillna(0)
 
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
-    print(df_salida)
+    total = int(df_salida["Kilos"].sum())
     df_json = df_salida.to_dict(orient="records")
-    
+    print(df_json)
+
 
     return jsonify({
         "message" : "Planificación realizada con exito",
-        "data": df_json
+        "data": df_json,
+        "total": total
     }), 200
