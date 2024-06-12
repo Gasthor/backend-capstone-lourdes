@@ -102,8 +102,6 @@ def strat_planning():
 
     obj_kilos = int(obj_kilos.replace(".",""))
 
-
-
     df = pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
 
     df_select = df[df['AÑO'].isin(years_selected)] 
@@ -132,11 +130,38 @@ def strat_planning():
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
     total = int(df_salida["Kilos"].sum())
     df_json = df_salida.to_dict(orient="records")
-    print(df_json)
+    ######################################################
+
+    ranking = df_select.groupby(["NUM_SEMANA", "AREA", "FAMILIA"])["KILOS ENTREGADOS"].sum().reset_index()
+
+    total_kilos = df_select.groupby(["NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
+
+    total_kilos.rename(columns={"KILOS ENTREGADOS": "TOTAL_KILOS"}, inplace=True)
+
+    ranking_con_total = pd.merge(ranking, total_kilos, on=["NUM_SEMANA"])
+
+    ranking_con_total["PORCENTAJE_PARTICIPACION"] = (ranking_con_total["KILOS ENTREGADOS"] / ranking_con_total["TOTAL_KILOS"]) * 100
+
+    ranking_con_total.rename(columns={"KILOS ENTREGADOS": "KILOS_ENTREGADOS"}, inplace=True)
+
+    ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
 
 
+    ranking_con_total["PORCENTAJE_PARTICIPACION"] = ranking_con_total["PORCENTAJE_PARTICIPACION"].round(2)
+
+    ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, True])
+
+
+    print(ranking_con_total.head(20))
+
+    ranking_json = ranking_con_total.to_dict(orient="records")
+
+
+
+    ##############################################################
     return jsonify({
         "message" : "Planificación realizada con exito",
         "data": df_json,
-        "total": total
+        "total": total,
+        "ranking" : ranking_json
     }), 200
