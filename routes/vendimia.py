@@ -131,7 +131,7 @@ def strat_planning():
     total = int(df_salida["Kilos"].sum())
     df_json = df_salida.to_dict(orient="records")
     ######################################################
-
+    
     ranking = df_select.groupby(["NUM_SEMANA", "AREA", "FAMILIA"])["KILOS ENTREGADOS"].sum().reset_index()
 
     total_kilos = df_select.groupby(["NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
@@ -144,8 +144,11 @@ def strat_planning():
 
     ranking_con_total.rename(columns={"KILOS ENTREGADOS": "KILOS_ENTREGADOS"}, inplace=True)
 
-    ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
+    if len(years_selected) > 1:
 
+        ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"] / len(years_selected)
+
+    ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
 
     ranking_con_total["PORCENTAJE_PARTICIPACION"] = ranking_con_total["PORCENTAJE_PARTICIPACION"].round(2)
 
@@ -156,12 +159,19 @@ def strat_planning():
 
     ranking_json = ranking_con_total.to_dict(orient="records")
 
+    contract_producer = df_select.groupby(["CONTRATO","FAMILIA","AREA","PRODUCTOR", "NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
 
+    contract_producer = contract_producer.rename(columns={"KILOS ENTREGADOS" : "KILOS_ENTREGADOS"}, inplace=False)
+
+    contract_producer = contract_producer.to_dict(orient="records")
+    
 
     ##############################################################
     return jsonify({
         "message" : "Planificación realizada con exito",
         "data": df_json,
         "total": total,
-        "ranking" : ranking_json
+        "ranking" : ranking_json,
+        "years" : years_selected,
+        "contract_producer" : contract_producer
     }), 200
