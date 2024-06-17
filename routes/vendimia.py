@@ -128,7 +128,10 @@ def strat_planning():
     df_salida['Porcentaje'] = df_salida['Porcentaje'].fillna(0)
 
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
+
+
     total = int(df_salida["Kilos"].sum())
+    
     df_json = df_salida.to_dict(orient="records")
     ######################################################
     
@@ -152,8 +155,14 @@ def strat_planning():
 
     ranking_con_total["PORCENTAJE_PARTICIPACION"] = ranking_con_total["PORCENTAJE_PARTICIPACION"].round(2)
 
-    ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, True])
+    # Calcular el porcentaje de participación por familia
+    por_familia = ranking_con_total.groupby(["FAMILIA", "NUM_SEMANA"])["PORCENTAJE_PARTICIPACION"].sum().reset_index()
+    por_familia.rename(columns={"PORCENTAJE_PARTICIPACION": "POR_FAMILIA"}, inplace=True)
 
+    # Fusionar el porcentaje de participación por familia de nuevo en el DataFrame original
+    ranking_con_total = pd.merge(ranking_con_total, por_familia, on=["FAMILIA", "NUM_SEMANA"])
+
+    ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "POR_FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, False])
 
     print(ranking_con_total.head(20))
 
@@ -162,6 +171,8 @@ def strat_planning():
     contract_producer = df_select.groupby(["CONTRATO","FAMILIA","AREA","PRODUCTOR", "NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
 
     contract_producer = contract_producer.rename(columns={"KILOS ENTREGADOS" : "KILOS_ENTREGADOS"}, inplace=False)
+    
+    contract_producer["KILOS_ENTREGADOS"] = contract_producer["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
 
     contract_producer = contract_producer.to_dict(orient="records")
     
