@@ -6,6 +6,13 @@ import pandas as pd
 from logic.algoritmo import generar_semanas, pesos_semanal
 from logic.files import search_file
 
+import locale
+
+try:
+    locale.setlocale(locale.LC_TIME, 'es_ES.utf-8')
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, 'C')
+
 vendimia_bp = Blueprint('vendimia', __name__)
 
 @vendimia_bp.route('/', methods=['POST'])
