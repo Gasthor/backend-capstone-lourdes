@@ -6,17 +6,15 @@ import pandas as pd
 from logic.algoritmo import generar_semanas, pesos_semanal
 from logic.files import search_file
 
-import locale
-
-try:
-    locale.setlocale(locale.LC_TIME, 'es_ES.utf-8')
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
-
 vendimia_bp = Blueprint('vendimia', __name__)
 
 @vendimia_bp.route('/', methods=['POST'])
 def get_files():
+    try:
+        locale.setlocale(locale.LC_TIME, 'es_ES.utf-8')
+    except locale.Error:
+        locale.setlocale(locale.LC_TIME, 'C')
+
     data = request.form.get("years")
     if not data:
         return jsonify({"error": "No se proporcionaron años"}), 400
@@ -51,8 +49,31 @@ def get_files():
     df_grouped = pd.merge(df_grouped, df_min_date, on=["Semana", "AÑO"], how="left")
 
     # Agregar columna del día de la semana en español
-    df_grouped['Dia'] = df_grouped['Fecha_inicio'].dt.day_name(locale='es_ES.utf-8')
-    df_grouped['Mes'] = df_grouped['Fecha_inicio'].dt.month_name(locale='es_ES.utf-8')
+    day_name_map = {
+            'Monday': 'Lunes',
+            'Tuesday': 'Martes',
+            'Wednesday': 'Miércoles',
+            'Thursday': 'Jueves',
+            'Friday': 'Viernes',
+            'Saturday': 'Sábado',
+            'Sunday': 'Domingo'
+        }
+    month_name_map = {
+        'January': 'Enero',
+        'February': 'Febrero',
+        'March': 'Marzo',
+        'April': 'Abril',
+        'May': 'Mayo',
+        'June': 'Junio',
+        'July': 'Julio',
+        'August': 'Agosto',
+        'September': 'Septiembre',
+        'October': 'Octubre',
+        'November': 'Noviembre',
+        'December': 'Diciembre'
+    }
+    df_grouped['Dia'] = df_grouped['Fecha_inicio'].dt.day_name().map(day_name_map)
+    df_grouped['Mes'] = df_grouped['Fecha_inicio'].dt.month_name().map(month_name_map)
 
     # Promedio de kilos por semana
     df_resumen = df_grouped.groupby(["Semana"])["Kilos"].mean().reset_index()
