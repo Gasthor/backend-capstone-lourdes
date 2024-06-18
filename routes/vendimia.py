@@ -1,3 +1,4 @@
+from datetime import timedelta
 from flask import Blueprint, json, jsonify, request
 import numpy as np
 import pandas as pd
@@ -30,7 +31,33 @@ def get_files():
 
     df_grouped = df_select.groupby(["NUM_SEMANA","AÑO"])["KILOS ENTREGADOS"].sum().reset_index()
     df_grouped = df_grouped.rename(columns={"NUM_SEMANA":"Semana", "KILOS ENTREGADOS": "Kilos"})
+
+    # Agrupar por semana y año, y sumar los kilos entregados
+    df_grouped = df_select.groupby(["NUM_SEMANA", "AÑO"])["KILOS ENTREGADOS"].sum().reset_index()
+    df_grouped = df_grouped.rename(columns={"NUM_SEMANA": "Semana", "KILOS ENTREGADOS": "Kilos"})
+
+    # Encontrar la fecha mínima para cada combinación de semana y año
+    df_min_date = df_select.groupby(["NUM_SEMANA", "AÑO"])["FECHA"].min().reset_index()
+    df_min_date = df_min_date.rename(columns={"NUM_SEMANA": "Semana", "FECHA": "Fecha_inicio"})
+
+    # Fusionar la fecha mínima con el DataFrame agrupado
+    df_grouped = pd.merge(df_grouped, df_min_date, on=["Semana", "AÑO"], how="left")
+
+    # Agregar columna del día de la semana en español
+    df_grouped['Dia'] = df_grouped['Fecha_inicio'].dt.day_name(locale='es_ES.utf-8')
+    df_grouped['Mes'] = df_grouped['Fecha_inicio'].dt.month_name(locale='es_ES.utf-8')
+
+    # Promedio de kilos por semana
     df_resumen = df_grouped.groupby(["Semana"])["Kilos"].mean().reset_index()
+
+    # Calcular lista de años, días y meses en español por semana
+    df_grouped['AÑO_Mes_Dia'] = df_grouped.apply(lambda row: [row['AÑO'],row['Fecha_inicio'].strftime('%d'), row['Dia'], row['Mes']], axis=1)
+    df_list = df_grouped.groupby('Semana')['AÑO_Mes_Dia'].apply(list).reset_index(name='Years')
+
+    # Fusionar la lista de años, días y meses con el DataFrame resumen
+    df_resumen = pd.merge(df_resumen, df_list, on="Semana", how="left")
+    print(df_grouped)
+    # Convertir a formato JSON
     df_json = df_resumen.to_dict(orient="records")
 
     min_week = df_grouped['Semana'].min()
@@ -47,7 +74,7 @@ def get_files():
             week.append(str(i+1) + " Semanas")
         weeks.append(week)
 
-    formatted_years = ', '.join(map(str, years))
+    formatted_years = ' - '.join(map(str, years))
     total_kilos = int(df_resumen['Kilos'].sum())
 
     return jsonify({
@@ -129,10 +156,14 @@ def strat_planning():
 
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
 
-
     total = int(df_salida["Kilos"].sum())
     
     df_json = df_salida.to_dict(orient="records")
+    ######################################################
+
+
+
+
     ######################################################
     
     ranking = df_select.groupby(["NUM_SEMANA", "AREA", "FAMILIA"])["KILOS ENTREGADOS"].sum().reset_index()
@@ -147,6 +178,8 @@ def strat_planning():
 
     ranking_con_total.rename(columns={"KILOS ENTREGADOS": "KILOS_ENTREGADOS"}, inplace=True)
 
+    ranking_con_total.columns = ranking_con_total.columns.str.strip()
+
     if len(years_selected) > 1:
 
         ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"] / len(years_selected)
@@ -160,11 +193,11 @@ def strat_planning():
     por_familia.rename(columns={"PORCENTAJE_PARTICIPACION": "POR_FAMILIA"}, inplace=True)
 
     # Fusionar el porcentaje de participación por familia de nuevo en el DataFrame original
-    ranking_con_total = pd.merge(ranking_con_total, por_familia, on=["FAMILIA", "NUM_SEMANA"])
+    ranking_con_total = pd.merge(ranking_con_total, por_familia, on=["FAMILIA", "NUM_SEMANA"], how='left')
 
     ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "POR_FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, False])
 
-    print(ranking_con_total.head(20))
+    print(ranking_con_total.head(30))
 
     ranking_json = ranking_con_total.to_dict(orient="records")
 
