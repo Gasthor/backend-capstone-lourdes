@@ -10,10 +10,6 @@ vendimia_bp = Blueprint('vendimia', __name__)
 
 @vendimia_bp.route('/', methods=['POST'])
 def get_files():
-    try:
-        locale.setlocale(locale.LC_TIME, 'es_ES.utf-8')
-    except locale.Error:
-        locale.setlocale(locale.LC_TIME, 'C')
 
     data = request.form.get("years")
     if not data:
