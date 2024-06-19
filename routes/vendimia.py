@@ -1,5 +1,6 @@
 from datetime import timedelta
-from flask import Blueprint, json, jsonify, request
+import os
+from flask import Blueprint, abort, json, jsonify, request, send_file
 import numpy as np
 import pandas as pd
 
@@ -80,7 +81,6 @@ def get_files():
 
     # Fusionar la lista de años, días y meses con el DataFrame resumen
     df_resumen = pd.merge(df_resumen, df_list, on="Semana", how="left")
-    print(df_grouped)
     # Convertir a formato JSON
     df_json = df_resumen.to_dict(orient="records")
 
@@ -181,14 +181,13 @@ def strat_planning():
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
 
     total = int(df_salida["Kilos"].sum())
+
+    ###Guardar archivo en carpeta generated_excel
+    filepath = os.path.join("./generated_excel/","distribucion-kg.xlsx")
+    os.makedirs("./generated_excel/", exist_ok=True)
+    df_salida.to_excel(filepath,index=False)
     
-    df_json = df_salida.to_dict(orient="records")
-    ######################################################
-
-
-
-
-    ######################################################
+    df_json = df_salida.to_dict(orient="records")#
     
     ranking = df_select.groupby(["NUM_SEMANA", "AREA", "FAMILIA"])["KILOS ENTREGADOS"].sum().reset_index()
 
@@ -212,6 +211,8 @@ def strat_planning():
 
     ranking_con_total["PORCENTAJE_PARTICIPACION"] = ranking_con_total["PORCENTAJE_PARTICIPACION"].round(2)
 
+    ranking_con_total = ranking_con_total[ranking_con_total["NUM_SEMANA"] <= duration]
+
     # Calcular el porcentaje de participación por familia
     por_familia = ranking_con_total.groupby(["FAMILIA", "NUM_SEMANA"])["PORCENTAJE_PARTICIPACION"].sum().reset_index()
     por_familia.rename(columns={"PORCENTAJE_PARTICIPACION": "POR_FAMILIA"}, inplace=True)
@@ -221,20 +222,28 @@ def strat_planning():
 
     ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "POR_FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, False])
 
-    print(ranking_con_total.head(30))
-
-    ranking_json = ranking_con_total.to_dict(orient="records")
+    ###Guardar archivo en carpeta generated_excel
+    filepath = os.path.join("./generated_excel/","ranking.xlsx")
+    os.makedirs("./generated_excel/", exist_ok=True)
+    ranking_con_total.to_excel(filepath,index=False)
+    
+    ranking_json = ranking_con_total.to_dict(orient="records")#
 
     contract_producer = df_select.groupby(["CONTRATO","FAMILIA","AREA","PRODUCTOR", "NUM_SEMANA"])["KILOS ENTREGADOS"].sum().reset_index()
 
     contract_producer = contract_producer.rename(columns={"KILOS ENTREGADOS" : "KILOS_ENTREGADOS"}, inplace=False)
     
     contract_producer["KILOS_ENTREGADOS"] = contract_producer["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
+    contract_producer = contract_producer[contract_producer["NUM_SEMANA"] <= duration]
 
-    contract_producer = contract_producer.to_dict(orient="records")
     
+    ###Guardar archivo en carpeta generated_excel
+    filepath = os.path.join("./generated_excel/","contrato-productor.xlsx")
+    os.makedirs("./generated_excel/", exist_ok=True)
+    contract_producer.to_excel(filepath,index=False)
 
-    ##############################################################
+    contract_producer = contract_producer.to_dict(orient="records")#
+    
     return jsonify({
         "message" : "Planificación realizada con exito",
         "data": df_json,
@@ -243,3 +252,41 @@ def strat_planning():
         "years" : years_selected,
         "contract_producer" : contract_producer
     }), 200
+
+@vendimia_bp.route('/download/', methods=['GET'])
+def download():
+    print("hola")
+
+    output_dir = './output/'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Cargar los archivos Excel
+    excel1 = pd.read_excel('./generated_excel/distribucion-kg.xlsx')
+
+    excel2 = pd.read_excel('./generated_excel/ranking.xlsx')
+    excel3 = pd.read_excel('./generated_excel/contrato-productor.xlsx')
+
+    output_filepath = os.path.join(output_dir, 'Resumen-planificación.xlsx')
+
+
+    # Crear un escritor de Excel con pandas
+    writer = pd.ExcelWriter(output_filepath, engine="openpyxl")
+    # Escribir cada DataFrame en una hoja separada
+    excel1.to_excel(writer, sheet_name='Distribucion de kilogramos', index=False)
+    excel2.to_excel(writer, sheet_name='Ranking', index=False)
+    excel3.to_excel(writer, sheet_name='Contrato productor', index=False)
+
+    writer.close()
+
+    print(excel1)
+
+    try:
+        file_path = f"./output/Resumen-planificación.xlsx"
+        if search_file("./output/", "Resumen-planificación.xlsx") == "Archivo no encontrado.":
+            abort(403, description="File not found")
+        # Crear una respuesta HTTP con el archivo adjunto
+        return send_file(file_path, as_attachment=True)
+        
+    except Exception as e:
+        print(f"Error al procesar la solicitud: {e}")
+        abort(500, description="Internal server error")
