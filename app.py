@@ -9,11 +9,9 @@ from routes.vendimia import vendimia_bp
 load_dotenv()
 
 origins = os.environ.get("ACCESS_CONTROL_ALLOW_ORIGIN", "").split(",")
-print("CORS origins:", origins)
 
 app = Flask(__name__)
 
-# Configurar CORS para manejar orígenes explícitamente
 CORS(app, origins=origins)
 app.register_blueprint(files_bp, url_prefix='/api/files')
 app.register_blueprint(vendimia_bp, url_prefix='/api/vendimia')

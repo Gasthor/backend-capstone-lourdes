@@ -1,10 +1,8 @@
 import pandas as pd
 
-
 # Verifica y modifica de ser necesario los factores para complir y no sobre pasar los limites semanales de la bodega
 def verificar_factores(df_semanas, kilos_objetivo, factor_semana, limite_kilos_semana):
   factor_semana_modificado = []
-  print(df_semanas)
   for index,factor in enumerate(factor_semana):
     if index in df_semanas.index:
         kilos_factor = df_semanas.loc[index, "Porcentaje"] * (factor/100) * kilos_objetivo
@@ -14,12 +12,11 @@ def verificar_factores(df_semanas, kilos_objetivo, factor_semana, limite_kilos_s
             nuevo_porcentaje = (df_semanas.loc[index, "Porcentaje"] * limite_kilos_semana[index])/kilos_semana
             df_semanas.loc[index, "Porcentaje"] = nuevo_porcentaje
             factor_semana_modificado.append(-100)
-
         else:
             factor_semana_modificado.append(factor_semana[index])
-  print(factor_semana,factor_semana_modificado)
   return factor_semana_modificado
 
+#Calcula los porcentajes de participacion para la vendimia a planificar
 def pesos_semanal(inicio, fin, factor_semana, kilos_objetivo, limite_kilos_semana, df_promedio_semanal):
     df_semanas_seleccionadas = df_promedio_semanal[df_promedio_semanal['NUM_SEMANA'].between(inicio, fin)]
     total_kilos = df_semanas_seleccionadas['Promedio Kilos'].sum()
@@ -37,7 +34,6 @@ def pesos_semanal(inicio, fin, factor_semana, kilos_objetivo, limite_kilos_seman
 
     # Calcular el porcentaje de exceso
     porcentaje_exceso = df_semanas_seleccionadas["Porcentaje"].sum()
-    ####################################################################
     ajuste = (porcentaje_exceso - 1) / semanas_sin_factor if semanas_sin_factor > 0 else 0
     suma_exceso = 0
     semanas_0 = 0
@@ -60,6 +56,7 @@ def pesos_semanal(inicio, fin, factor_semana, kilos_objetivo, limite_kilos_seman
 
     return df_semanas_seleccionadas
 
+#Clase que hace referencia a las semanas de vendimia
 class Semana:
     def __init__(self, num_semana, porcentaje, limite_kilos_semana, factor):
         self.num_semana = num_semana
@@ -91,12 +88,14 @@ class Semana:
     def __str__(self):
         return f'Semana {self.num_semana}'
 
+#Funcion para buscar la semana por numero
 def buscar_semana_por_numero(numero, lista_semanas):
     for semana in lista_semanas:
         if semana.num_semana == numero:
             return semana
     return None
 
+#Funcion que genera las semanas segun los parametros entregados por el usuario
 def generar_semanas(inicio, fin, kilos_obj, limite_kilos_semana, df_semanas_seleccionadas, factor_semana):
     semanas = []
     kilos_excedentes = 0
@@ -135,7 +134,5 @@ def generar_semanas(inicio, fin, kilos_obj, limite_kilos_semana, df_semanas_sele
     df_semanas_kilos = pd.DataFrame([(semana.num_semana, semana.kilos_entregar) for semana in semanas],
                                      columns=['NUM_SEMANA', 'Kilos_Entregar'])
     df_semanas_kilos = df_semanas_kilos.merge(df_semanas_seleccionadas[['NUM_SEMANA', 'Porcentaje']], on='NUM_SEMANA', how='left')
-
-    total_kilos_entregar = df_semanas_kilos['Kilos_Entregar'].sum()
 
     return df_semanas_kilos

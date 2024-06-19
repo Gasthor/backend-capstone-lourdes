@@ -9,6 +9,7 @@ from logic.files import search_file
 
 vendimia_bp = Blueprint('vendimia', __name__)
 
+#Ruta para obtener informacion de las vendimias seleccionadas
 @vendimia_bp.route('/', methods=['POST'])
 def get_files():
 
@@ -34,18 +35,14 @@ def get_files():
     df_grouped = df_select.groupby(["NUM_SEMANA","AÑO"])["KILOS ENTREGADOS"].sum().reset_index()
     df_grouped = df_grouped.rename(columns={"NUM_SEMANA":"Semana", "KILOS ENTREGADOS": "Kilos"})
 
-    # Agrupar por semana y año, y sumar los kilos entregados
     df_grouped = df_select.groupby(["NUM_SEMANA", "AÑO"])["KILOS ENTREGADOS"].sum().reset_index()
     df_grouped = df_grouped.rename(columns={"NUM_SEMANA": "Semana", "KILOS ENTREGADOS": "Kilos"})
 
-    # Encontrar la fecha mínima para cada combinación de semana y año
     df_min_date = df_select.groupby(["NUM_SEMANA", "AÑO"])["FECHA"].min().reset_index()
     df_min_date = df_min_date.rename(columns={"NUM_SEMANA": "Semana", "FECHA": "Fecha_inicio"})
 
-    # Fusionar la fecha mínima con el DataFrame agrupado
     df_grouped = pd.merge(df_grouped, df_min_date, on=["Semana", "AÑO"], how="left")
 
-    # Agregar columna del día de la semana en español
     day_name_map = {
             'Monday': 'Lunes',
             'Tuesday': 'Martes',
@@ -72,16 +69,13 @@ def get_files():
     df_grouped['Dia'] = df_grouped['Fecha_inicio'].dt.day_name().map(day_name_map)
     df_grouped['Mes'] = df_grouped['Fecha_inicio'].dt.month_name().map(month_name_map)
 
-    # Promedio de kilos por semana
     df_resumen = df_grouped.groupby(["Semana"])["Kilos"].mean().reset_index()
 
-    # Calcular lista de años, días y meses en español por semana
     df_grouped['AÑO_Mes_Dia'] = df_grouped.apply(lambda row: [row['AÑO'],row['Fecha_inicio'].strftime('%d'), row['Dia'], row['Mes']], axis=1)
     df_list = df_grouped.groupby('Semana')['AÑO_Mes_Dia'].apply(list).reset_index(name='Years')
 
-    # Fusionar la lista de años, días y meses con el DataFrame resumen
     df_resumen = pd.merge(df_resumen, df_list, on="Semana", how="left")
-    # Convertir a formato JSON
+
     df_json = df_resumen.to_dict(orient="records")
 
     min_week = df_grouped['Semana'].min()
@@ -109,6 +103,7 @@ def get_files():
         "weeks": weeks
     }), 200
 
+#Ruta para generar la planificacion 
 @vendimia_bp.route('/planificacion', methods=['POST'])
 def strat_planning():
     try:
@@ -176,6 +171,7 @@ def strat_planning():
         return jsonify({
         "message" : f"Error en calcular semanas, mensaje error: ${e}",
     }), 400
+
     df_salida['Porcentaje'] = df_salida['Porcentaje'].fillna(0)
 
     df_salida.rename(columns={"NUM_SEMANA": "Semana", "Kilos_Entregar" : "Kilos"}, inplace=True)
@@ -187,7 +183,7 @@ def strat_planning():
     os.makedirs("./generated_excel/", exist_ok=True)
     df_salida.to_excel(filepath,index=False)
     
-    df_json = df_salida.to_dict(orient="records")#
+    df_json = df_salida.to_dict(orient="records")
     
     ranking = df_select.groupby(["NUM_SEMANA", "AREA", "FAMILIA"])["KILOS ENTREGADOS"].sum().reset_index()
 
@@ -213,11 +209,10 @@ def strat_planning():
 
     ranking_con_total = ranking_con_total[ranking_con_total["NUM_SEMANA"] <= duration]
 
-    # Calcular el porcentaje de participación por familia
     por_familia = ranking_con_total.groupby(["FAMILIA", "NUM_SEMANA"])["PORCENTAJE_PARTICIPACION"].sum().reset_index()
+
     por_familia.rename(columns={"PORCENTAJE_PARTICIPACION": "POR_FAMILIA"}, inplace=True)
 
-    # Fusionar el porcentaje de participación por familia de nuevo en el DataFrame original
     ranking_con_total = pd.merge(ranking_con_total, por_familia, on=["FAMILIA", "NUM_SEMANA"], how='left')
 
     ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "POR_FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, False])
@@ -234,8 +229,8 @@ def strat_planning():
     contract_producer = contract_producer.rename(columns={"KILOS ENTREGADOS" : "KILOS_ENTREGADOS"}, inplace=False)
     
     contract_producer["KILOS_ENTREGADOS"] = contract_producer["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
-    contract_producer = contract_producer[contract_producer["NUM_SEMANA"] <= duration]
 
+    contract_producer = contract_producer[contract_producer["NUM_SEMANA"] <= duration]
     
     ###Guardar archivo en carpeta generated_excel
     filepath = os.path.join("./generated_excel/","contrato-productor.xlsx")
@@ -253,40 +248,47 @@ def strat_planning():
         "contract_producer" : contract_producer
     }), 200
 
+#Ruta para descargar los archivos generados en la planificacion en un solo excel
 @vendimia_bp.route('/download/', methods=['GET'])
 def download():
-    print("hola")
-
     output_dir = './output/'
     os.makedirs(output_dir, exist_ok=True)
 
-    # Cargar los archivos Excel
     excel1 = pd.read_excel('./generated_excel/distribucion-kg.xlsx')
-
     excel2 = pd.read_excel('./generated_excel/ranking.xlsx')
     excel3 = pd.read_excel('./generated_excel/contrato-productor.xlsx')
 
     output_filepath = os.path.join(output_dir, 'Resumen-planificación.xlsx')
 
+    writer = pd.ExcelWriter(output_filepath, engine="xlsxwriter")
 
-    # Crear un escritor de Excel con pandas
-    writer = pd.ExcelWriter(output_filepath, engine="openpyxl")
-    # Escribir cada DataFrame en una hoja separada
     excel1.to_excel(writer, sheet_name='Distribucion de kilogramos', index=False)
     excel2.to_excel(writer, sheet_name='Ranking', index=False)
     excel3.to_excel(writer, sheet_name='Contrato productor', index=False)
 
-    writer.close()
+    workbook = writer.book
+    worksheet = writer.sheets["Distribucion de kilogramos"] 
 
-    print(excel1)
+    chart = workbook.add_chart({"type": "column"})
+    (max_row, max_col) = excel1.shape
+    chart.add_series({
+        "values": ["Distribucion de kilogramos", 1, 1, max_row, 1], 
+        "name": "Kilogramos distribuidos"
+        })
+
+    chart.set_title({"name": "Distribución de Kilogramos"})
+    chart.set_x_axis({"name": "Semanas"})
+    chart.set_y_axis({"name": "Kilogramos"})
+
+    worksheet.insert_chart(1, 3, chart)
+
+    writer.close()
 
     try:
         file_path = f"./output/Resumen-planificación.xlsx"
         if search_file("./output/", "Resumen-planificación.xlsx") == "Archivo no encontrado.":
             abort(403, description="File not found")
-        # Crear una respuesta HTTP con el archivo adjunto
         return send_file(file_path, as_attachment=True)
         
     except Exception as e:
-        print(f"Error al procesar la solicitud: {e}")
         abort(500, description="Internal server error")

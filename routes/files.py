@@ -7,16 +7,13 @@ from logic.files import search_file
 
 files_bp = Blueprint('files', __name__)
 
+# Ruta para subir archivos referente a las vendimias
 @files_bp.route('/upload', methods=['POST'])
 def upload_excel():
     data = request.form.get("data")
     color = request.form.get("COLOR VARIEDAD")
 
     data_dict = json.loads(data)
-
-    print(data, color)
-    # Invertir clave-valor ejemplo: {"hola" : "chao"} => {"chao" : "hola"}
-    #data_dict_upper = {k.upper(): v.upper() for k, v in data_dict.items()}
 
     data = {v: k for k, v in data_dict.items()}
 
@@ -34,14 +31,14 @@ def upload_excel():
         
         try:
             df = pd.read_excel(file)
-            #df = df.apply(lambda x: x.str.upper() if x.dtype == "object" else x)
+
             df = df.rename(columns= data, errors="raise")
 
             if pd.api.types.is_numeric_dtype(df["FECHA"]):
                 df["FECHA"] = pd.to_datetime(df["FECHA"], unit='D', origin='1899-12-30', errors='coerce')
             else:
                 df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
-            #Elimina los NaN que esten presente en la columna FECHA
+
             df = df.dropna(subset=['FECHA'])
 
             df["DIA"] = df["FECHA"].dt.day
@@ -55,7 +52,6 @@ def upload_excel():
                 return jsonify({"error": f"El año de vendimia {year} ya se encuentra cargado, por favor elimine el archivo antes de subir uno nuevo del mismo año"}), 400
             
             else:
-                #### LOGICA ETL Y AGREGAR DF AL HISTORICO
 
                 if color and color != "":
                     df = df.rename(columns={color: "COLOR VARIEDAD"})
@@ -72,10 +68,8 @@ def upload_excel():
                 df["NUM_SEMANA"] = df["FECHA"].dt.strftime("%G-%V")
                 df["NUM_SEMANA"] = df.groupby(df["FECHA"].dt.year)["NUM_SEMANA"].transform(lambda x: (pd.to_numeric(x.str[-2:]) - pd.to_numeric(x.str[-2:]).min() + 1))
 
-
-                #######
                 df = df[["FECHA", "CONTRATO", "PRODUCTOR", "KILOS ENTREGADOS", "RUT", "FAMILIA", "AREA","GRADO BRIX","TEMPERATURA", "CALIDAD", "NUM_SEMANA", "DIA", "MES", "AÑO"]]
-                ###Agregar informacion a archivo historico de vendimias
+
                 if search_file("./generated_excel/", "Vendimia_historica.xlsx") == "Archivo no encontrado.":
                     filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
                     os.makedirs("./generated_excel/", exist_ok=True)
@@ -92,8 +86,6 @@ def upload_excel():
                     filepath = os.path.join("./generated_excel/","Vendimia_historica.xlsx")
                     os.makedirs("./generated_excel/", exist_ok=True)
                     df_historico.to_excel(filepath,index=False)
-                
-                
 
                 ###Guardar archivo en carpeta uploads
                 filepath = os.path.join("./uploads/",name_file)
@@ -107,11 +99,11 @@ def upload_excel():
     else:
         return jsonify({"error": "Archivo cargado no es .xlsx"}), 400
     
+# Ruta para eliminar una vendimia del sistema
 @files_bp.route('/delete/<name>/<year>', methods=['DELETE'])
 def delete_excel(name,year):
     try:
         os.remove(f"./uploads/{name}_{year}.xlsx")
-        ### LOGICA DE ELIMINAR ARCHIVO DE DF HISTORICO
         
         df_historico_delete = pd.read_excel("./generated_excel/Vendimia_historica.xlsx")
         df_historico_delete = df_historico_delete[df_historico_delete["AÑO"] != int(year)]
@@ -124,6 +116,7 @@ def delete_excel(name,year):
             return jsonify({"error": "Archivo no encontrado, si el problema persiste, comunicarse con el administrador."}), 500 
     return jsonify({"message": f"Archivo '{name}' eliminado con exito"}), 200
 
+#Ruta para obtener los archivos cargados en el sistema
 @files_bp.route('/', methods=['GET'])
 def get_files():
     folder = os.listdir("./uploads")
@@ -137,7 +130,6 @@ def get_files():
         file = file.replace("_",".")
         file = file.split(".")
         ## Obtener los kilos producidos por semana en el año iterado
-
         year = int(file[1])
 
         df_filtred = df[df["AÑO"] == year]
@@ -156,14 +148,13 @@ def get_files():
 
     return response, 200
 
+#Ruta para descargar archivo historico de vendimias cargadas en el sistema
 @files_bp.route('/download/<path:filename>', methods=['GET'])
 def download(filename):
-    print(filename)
     try:
         file_path = f"./generated_excel/{filename}"
         if search_file("./generated_excel/", "Vendimia_historica.xlsx") == "Archivo no encontrado.":
             abort(404, description="File not found")
-        # Crear una respuesta HTTP con el archivo adjunto
         return send_file(file_path, as_attachment=True)
         
     except Exception as e:
