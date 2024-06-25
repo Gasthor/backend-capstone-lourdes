@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import os
 from flask import Blueprint, abort, json, jsonify, request, send_file
 import numpy as np
@@ -106,13 +106,23 @@ def get_files():
 #Ruta para generar la planificacion 
 @vendimia_bp.route('/planificacion', methods=['POST'])
 def strat_planning():
+
+    def calcular_fecha(semana):
+        dias_semana = (semana - 1) * 7  # Calcular los días a agregar desde la semana de inicio
+        fecha = week_start + timedelta(days=dias_semana)
+        return fecha
+
     try:
         years_selected = request.form.get("years")
         obj_kilos = request.form.get("obj_kilos")
         limit_week = request.form.get("limit_week")
         factor_week = request.form.get("factor_week")
         duration = int(request.form.get("duration"))
+        week_start = request.form.get("week_start")
+        week_start = datetime.strptime(f"{week_start}-1", "%G-W%V-%u")
+        print(week_start)
     except Exception as e:
+        print(e)
         return jsonify({
         "error": f"Error al enviar datos: {e}"
         }), 400
@@ -178,6 +188,8 @@ def strat_planning():
 
     total = int(df_salida["Kilos"].sum())
 
+    df_salida['Fecha'] = df_salida['Semana'].apply(calcular_fecha)
+    
     ###Guardar archivo en carpeta generated_excel
     filepath = os.path.join("./generated_excel/","distribucion-kg.xlsx")
     os.makedirs("./generated_excel/", exist_ok=True)
@@ -203,8 +215,6 @@ def strat_planning():
 
         ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"] / len(years_selected)
 
-    ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
-
     ranking_con_total["PORCENTAJE_PARTICIPACION"] = ranking_con_total["PORCENTAJE_PARTICIPACION"].round(2)
 
     ranking_con_total = ranking_con_total[ranking_con_total["NUM_SEMANA"] <= duration]
@@ -217,10 +227,18 @@ def strat_planning():
 
     ranking_con_total = ranking_con_total.sort_values(by=["NUM_SEMANA", "POR_FAMILIA", "PORCENTAJE_PARTICIPACION"], ascending=[True, False, False])
 
+    ranking_con_total = ranking_con_total[ranking_con_total["NUM_SEMANA"] <= duration]
+
+    for i in range(len(list_limit_week)):
+            if list_limit_week[i] == 0:
+                ranking_con_total = ranking_con_total[ranking_con_total["NUM_SEMANA"] != i + 1]
     ###Guardar archivo en carpeta generated_excel
     filepath = os.path.join("./generated_excel/","ranking.xlsx")
     os.makedirs("./generated_excel/", exist_ok=True)
     ranking_con_total.to_excel(filepath,index=False)
+
+    ranking_con_total["KILOS_ENTREGADOS"] = ranking_con_total["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f}".replace(',', '.') + " kg")
+
     
     ranking_json = ranking_con_total.to_dict(orient="records")#
 
@@ -228,14 +246,20 @@ def strat_planning():
 
     contract_producer = contract_producer.rename(columns={"KILOS ENTREGADOS" : "KILOS_ENTREGADOS"}, inplace=False)
     
-    contract_producer["KILOS_ENTREGADOS"] = contract_producer["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f} kg")
-
+    
     contract_producer = contract_producer[contract_producer["NUM_SEMANA"] <= duration]
+
+    for i in range(len(list_limit_week)):
+            if list_limit_week[i] == 0:
+                contract_producer = contract_producer[contract_producer["NUM_SEMANA"] != i + 1]
     
     ###Guardar archivo en carpeta generated_excel
     filepath = os.path.join("./generated_excel/","contrato-productor.xlsx")
     os.makedirs("./generated_excel/", exist_ok=True)
     contract_producer.to_excel(filepath,index=False)
+    
+    contract_producer["KILOS_ENTREGADOS"] = contract_producer["KILOS_ENTREGADOS"].apply(lambda x: f"{x:,.0f}".replace(',', '.') + " kg")
+
 
     contract_producer = contract_producer.to_dict(orient="records")#
     
