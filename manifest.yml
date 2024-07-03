@@ -1,0 +1,12 @@
+#................
+#  SCP SPACE QA
+#................
+applications:
+- name: capstonebackendlourdes
+  memory: 2GB
+  disk_quota: 2GB
+  ignore:
+      - .env
+
+env:
+  ACCESS_CONTROL_ALLOW_ORIGIN: http://localhost:3000,https://frontend-capstone-project-vct-2024-1.vercel.app,http://192.168.1.84:3000,https://capstonefront2024-1.cfapps.br10.hana.ondemand.com

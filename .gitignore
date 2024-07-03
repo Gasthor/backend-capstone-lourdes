@@ -3,3 +3,4 @@
 /.vscode
 /.uploads/*
 .env
+.cfignore
